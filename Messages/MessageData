@@ -1,0 +1,106 @@
+using CCC_API.Data.PostData.Messages;
+using CCC_API.Data.Responses.Messages;
+using RestSharp;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace CCC_API.Services.Messages
+{
+    public class MessageService : AuthApiService
+    {
+        public static string MessageEndPoint = "social/posts";
+        public static string AccountsEndPoint = "social/accounts";
+        public static string PinterestsEndPoint = "social/pinterest/";
+        public static readonly string PinterestBoardEndpoint = "/boards";
+
+        public MessageService(string sessionKey) : base(sessionKey) { }
+
+        /// <summary>
+        /// This method creates a body and post the message as a social media post.
+        /// </summary>
+        /// <param name="platform">Social media platform to publish to (FacebookFanPage, Twitter, LinkedInCompany, Pinterest</param>
+        /// <param name="textLength">Required length of the string to generate</param>
+        /// <param name="imageUrl">Image url to attach to the post</param>
+        /// <param name="shortenUrls">if true, url shorten service will be enabled</param>
+        /// <returns> client posts the message</returns> 
+        public IRestResponse PostMessage(SocialPostInfo socialMediaList, string textLength, string imageUrl, bool shortenUrls)
+        {
+            var postData = new MessageData()
+            {
+                Content = textLength,
+                Title = "",
+                SocialPostInfos = new List<SocialPostInfo> { socialMediaList },
+                ShortenUrls = shortenUrls,
+                SharedImageUrl = imageUrl
+            };
+            var response = Post<MessageResponse>(MessageEndPoint, GetAuthorizationHeader(), postData);
+            return response;
+        }
+
+        /// <summary>
+        /// Generates a random string with the required length.
+        /// </summary>
+        /// <param name="Size">Required length of the string to generate</param>
+        /// <returns>new string</returns> - String generated
+        public string GetRandomString(int Size)
+        {
+            Random random = new System.Random();
+            string input = "abcdefghijklmnopqrstuvwxyz0123456789";
+            var chars = Enumerable.Range(0, Size)
+                                   .Select(x => input[random.Next(0, input.Length)]);
+            return new string(chars.ToArray());
+        }
+
+        /// <summary>
+        /// Populate SocialPostInfo object
+        /// </summary>
+        /// <param name="platform">Social media platform where to publish</param>
+        /// <returns>response</returns> 
+        public SocialPostInfo PlatformAsProperty(string platform)
+        {
+            string pinterestBoard = null;
+            if (platform == "Pinterest")
+            {
+                pinterestBoard = GetPinterestBoard().Data[0].Id;
+            }
+            var response = new SocialPostInfo()
+            {
+                SocialMediaAccountType = platform,
+                Attributes = pinterestBoard
+            };
+            return response;
+        }
+
+        /// <summary>
+        ///Get Pinterest Board id 
+        /// </summary>
+        /// <param name="PinterestBoardResponse">List of the Pinterest boards connected to the company</param>
+        /// <returns>PinterestBoardResponse</returns> 
+        public IRestResponse<List<PinterestBoardResponse>> GetPinterestBoard()
+        {
+            var response = GetAccounts();
+            int source_external_id = 0;
+            for (int i = 0; i < response.Data.Count; i++)
+            {
+                if (response.Data[i].Type == "Pinterest")
+                {
+                    source_external_id = response.Data[i].ExternalApplicationId;
+                    break;
+                }
+            }
+            return Get<List<PinterestBoardResponse>>(PinterestsEndPoint + source_external_id + PinterestBoardEndpoint);
+        }
+
+        /// <summary>
+        ///Get social media accounts connected to a Company 
+        /// </summary>
+        /// <param name="Accounts">List of the social media accounts  connected to the company</param>
+        /// <returns>List of accounts connected to the company</returns> 
+        public IRestResponse<List<Accounts>> GetAccounts()
+        {
+            return Get<List<Accounts>>(AccountsEndPoint);
+        }
+    }
+}
+
